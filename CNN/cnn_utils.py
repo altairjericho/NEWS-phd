@@ -52,9 +52,16 @@ class call_roc_hist(keras.callbacks.Callback):
         return
     
     
-def load_data(sig_n='C100keV', bckg_n='gamma', training=True, path_h5="/home/scanner-ml/Artem/Python/NEWS/data/"):
+def load_data(sig_n='C100keV', bckg_n='gamma', training=True, images=True, feat_study=False, path_h5="/home/scanner-ml/Artem/Python/NEWS/data/", shuf_ind={}):
     res=[]
+    if feat_study: path_h5 += 'ft_'
     with h5py.File(path_h5+'dataset.h5','r') as datafile:
+        if images:
+            sig_n += '/images'
+            bckg_n += '/images'
+        else:
+            sig_n += '/features'
+            bckg_n += '/features'
         if training:
             X_train = np.vstack((datafile[sig_n+'/train'][...], datafile[bckg_n+'/train'][...]))
             y_train = np.append(np.ones(datafile[sig_n+'/train'].shape[0]),np.zeros(datafile[bckg_n+'/train'].shape[0]))    
@@ -62,22 +69,24 @@ def load_data(sig_n='C100keV', bckg_n='gamma', training=True, path_h5="/home/sca
         y_test = np.append(np.ones(datafile[sig_n+'/test'].shape[0]),np.zeros(datafile[bckg_n+'/test'].shape[0]))
     gc.collect()
     if training:
-        X_train.resize((*X_train.shape,1))
-        shuf_ind = list(np.arange(X_train.shape[0]))
-        np.random.shuffle(shuf_ind)
-        X_train = X_train[shuf_ind]
-        y_train = y_train[shuf_ind]
+        if images: X_train.resize((*X_train.shape,1))
+        if not 'train' in shuf_ind.keys():
+            shuf_ind['train'] = list(np.arange(X_train.shape[0]))
+            np.random.shuffle(shuf_ind['train'])
+        X_train = X_train[shuf_ind['train']]
+        y_train = y_train[shuf_ind['train']]
         print ("X_train shape:\t" + str(X_train.shape))
         print ("y_train shape:\t" + str(y_train.shape))
         res += [X_train, y_train]
-    X_test.resize((*X_test.shape,1))
-    shuf_ind = list(np.arange(X_test.shape[0]))
-    np.random.shuffle(shuf_ind)
-    X_test = X_test[shuf_ind]
-    y_test = y_test[shuf_ind]
+    if images: X_test.resize((*X_test.shape,1))
+    if not 'test' in shuf_ind.keys():
+        shuf_ind['test'] = list(np.arange(X_test.shape[0]))
+        np.random.shuffle(shuf_ind['test'])
+    X_test = X_test[shuf_ind['test']]
+    y_test = y_test[shuf_ind['test']]
     print ("X_test shape:\t" + str(X_test.shape))
     print ("y_test shape:\t" + str(y_test.shape))
-    res += [X_test, y_test]
+    res += [X_test, y_test, shuf_ind]
     gc.collect()
     return res
 
@@ -96,10 +105,21 @@ def pos_neg(y, preds):
 
 
 
-def load_outputs(train_l = True, val_l = True, rocs = True, path_out="/home/scanner-ml/Artem/Python/NEWS/CNN/outputs/", epochs=['10','50'], model_spec='conv4_3d_res/v1_'):
+def load_outputs(train_l = True, val_l = True, roc_l = True, path_out="/home/scanner-ml/Artem/Python/NEWS/CNN/outputs/", epochs=['10','50'], model_spec='conv4_3d_res/v1_'):
     loss, valoss, rocs = {},{},{}
     for e in epochs:
         if train_l: loss[e] = np.loadtxt(path_out+model_spec+'loss_train_'+e+'.txt')
         if val_l: valoss[e] = np.loadtxt(path_out+model_spec+'loss_val_'+e+'.txt')
-        if rocs: rocs[e] = np.loadtxt(path_out+model_spec+'roc-auc_'+e+'.txt')
+        if roc_l: rocs[e] = np.loadtxt(path_out+model_spec+'roc-auc_'+e+'.txt')
     return loss, valoss, rocs
+
+
+
+def clean_quantile_feat(params, quant_up, quant_down, clean_key):
+    """
+    Dropping few percent most outlying samples using quantiles, which are bigger than quant_up or smaller than quant_down.
+    """
+    for key in clean_key:
+        params = params[ params[key]<params[key].quantile(quant_up) ]
+        params = params[ params[key]>params[key].quantile(1-quant_down) ]
+    return params.dropna()
