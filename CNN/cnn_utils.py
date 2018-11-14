@@ -4,6 +4,8 @@ import pandas as pd
 import os, re, gc
 import h5py
 import keras
+from keras.models import Model
+from keras.layers import Input
 from sklearn.metrics import roc_curve, precision_recall_curve, roc_auc_score
 
 
@@ -51,15 +53,23 @@ class call_roc_hist(keras.callbacks.Callback):
         print('\n',epoch,'\troc_auc:',scoroc,'\n')
         return
     
+def new_input_shape(model, input_shape):    
+    newInput = Input(shape=input_shape)
+    newOutputs = model(newInput)
+    new_model = Model(newInput, newOutputs, name=model.name+'inp_chng')
+    new_model.compile(optimizer=model.optimizer, loss=model.loss)
+    #new_model.summary()
+    return new_model
+    
     
 def load_data(sig_n='C100keV', bckg_n='gamma', training=True, images=True, feat_study=False, path_h5="/home/scanner-ml/Artem/Python/NEWS/data/", shuf_ind={}):
     res=[]
     if feat_study: path_h5 += 'ft_'
     with h5py.File(path_h5+'dataset.h5','r') as datafile:
-        if images:
+        if images and feat_study:
             sig_n += '/images'
             bckg_n += '/images'
-        else:
+        elif feat_study:
             sig_n += '/features'
             bckg_n += '/features'
         if training:
