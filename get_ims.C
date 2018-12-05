@@ -34,7 +34,7 @@ DMRView *v=0;
 
 
 
-void get_ims( int dr=16, const char *file="dm_tracks_cl.dm.root")
+void get_ims( const char *yand_file="yandex_bfcl.txt", const char *file="dm_tracks_cl.dm.root", int dr=16)
 {
   run = new DMRRun(file);
   run->GetHeader()->Print();
@@ -45,14 +45,14 @@ void get_ims( int dr=16, const char *file="dm_tracks_cl.dm.root")
 
 
 	string line, cell;
-  int i, i_pol, micro;
+  int i, i_pol, tr_f, n_pol;
   int ihd, iv, igr;
   int x0,y0,nx,ny;
-  int *csv_line = new int[12];
+  int *csv_line = new int[13];
   int *cl_id = new int[8];
   float pixX, pixY;
   int x_ind, y_ind;
-  ifstream cl_file ("yandex_bfcl.txt");
+  ifstream cl_file (yand_file);
 	while ( getline (cl_file,line) )
     {
       istringstream str_line(line);
@@ -71,7 +71,9 @@ void get_ims( int dr=16, const char *file="dm_tracks_cl.dm.root")
         cl_id[i-3]=csv_line[i];
         ++i;
         }
-			micro=csv_line[11];
+			tr_f=csv_line[11]; n_pol=csv_line[12];
+			
+			if(n_pol==0){continue;}
 
 			v = run->GetEntry(ihd,1,1,1,1,1,1);
 
@@ -81,7 +83,9 @@ void get_ims( int dr=16, const char *file="dm_tracks_cl.dm.root")
       nx   = run->GetHeader()->npixX;
       ny   = run->GetHeader()->npixY;
       DMRViewHeader   *hd = v->GetHD();
+      while(cl_id[i_pol]==-1 && i_pol<7){++i_pol;}
       if(hd->flag==0){
+        cout<<"\n"<<cl_id[i_pol]<<endl;
     	  DMRCluster      *cl = v->GetCL(cl_id[i_pol]);
       	DMRFrame        *frcl = v->GetFR(cl->ifr);       
       	DMRFrame        *fr  = v->GetFR(frcl->iz,frcl->ipol);
@@ -92,7 +96,7 @@ void get_ims( int dr=16, const char *file="dm_tracks_cl.dm.root")
         TH2F *h = im->GetHist2();
 
         TString path="";
-        path.Form("%s%i%s%i%s%i%s%i%s","csvs/",ihd,"_gr",igr,"_cl",cl_id[i_pol],"_pol",i_pol,".csv");
+        path.Form("%s%i%s%i%s%i%s%i%s%i%s%i%s", "csvs/",ihd,"_gr_",igr,"_pol_",i_pol,"_cl_",cl_id[i_pol],"_tr_",tr_f,"_npol_",n_pol,".csv");
         ofstream out_csv(path);
         for(y_ind = h->GetNbinsY(); y_ind >= 2; --y_ind) 
         {
@@ -109,23 +113,26 @@ void get_ims( int dr=16, const char *file="dm_tracks_cl.dm.root")
       while(i_pol<7)
       {
         ++i_pol;
-        DMRImageCl *im    = run->GetCLIMBFC(ihd,cl_id[i_pol],i_pol,dr,x0,y0);
-        TH2F *h = im->GetHist2();
-
-        TString path="";
-        path.Form("%s%i%s%i%s%i%s%i%s","csvs/",ihd,"_gr",igr,"_cl",cl_id[i_pol],"_pol",i_pol,".csv");
-        ofstream out_csv(path);
-        for(y_ind = h->GetNbinsY(); y_ind >= 2; --y_ind) 
+        if (cl_id[i_pol]!=-1)
         {
-          for(x_ind = 2; x_ind < h->GetNbinsX() + 1; ++x_ind)
+          DMRImageCl *im    = run->GetCLIMBFC(ihd,cl_id[i_pol],i_pol,dr,x0,y0);
+          TH2F *h = im->GetHist2();
+
+          TString path="";
+          path.Form("%s%i%s%i%s%i%s%i%s%i%s%i%s", "csvs/",ihd,"_gr_",igr,"_pol_",i_pol,"_cl_",cl_id[i_pol],"_tr_",tr_f,"_npol_",n_pol,".csv");
+          ofstream out_csv(path);
+          for(y_ind = h->GetNbinsY(); y_ind >= 2; --y_ind) 
           {
-            out_csv<< h->GetBinContent(x_ind, y_ind)<<",";
+            for(x_ind = 2; x_ind < h->GetNbinsX() + 1; ++x_ind)
+            {
+              out_csv<< h->GetBinContent(x_ind, y_ind)<<",";
+            }
+            out_csv<<"\n";
           }
-          out_csv<<"\n";
+          out_csv.close();
+          delete h;
+          delete im;
         }
-        out_csv.close();
-        delete h;
-        delete im;
       }
       //delete hd;
       //delete cl;
@@ -152,9 +159,6 @@ remember the order:
 > run: root dm_tracks_cl.dm.root
 > gSystem->Load("libDMRoot")
 > .x get_ims.C(file, dr)
-
-before creating the root file:
-add a parameter -flim:100500 (maximum size) to .bat files
 */
 
 
