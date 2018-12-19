@@ -145,22 +145,31 @@ def clean_quantile_feat(params, quant_up, quant_down, clean_key):
 
 
 
-def load_data_v2(classes={'s_C30keV':'full','b_gamma':'full'}, tr_val_test=[True,True,False], im_ft=[True,False], path_h5="/home/scanner-ml/Artem/Python/NEWS/data/dataset_clean.h5", shuf_ind={}, verbose=1):
-    X,y = {},{}
-    halves = {'full':[1,1], '1':[2,2], '2':[1,2]}
-    # halves: [end, factor] -> N//e-N//f:N//e
+def load_data_v2(classes={'s_C30keV':'full','b_gamma':'full'}, n_folds=1, tr_val_test=[True,True,False], im_ft=[True,False], path_h5="/home/scanner-ml/Artem/Python/NEWS/data/dataset_clean.h5", shuf_ind={}, verbose=1, ddd=True, stratify=False):
+    '''
+    Documentation-shmocumentation
+    Pseudo-cross-validation
+    '''
+    X,y,bound,start,end = {},{},{},{},{}
     if len(tr_val_test)<3 or len(im_ft)<2:
         print('len tr_val_test:',len(tr_val_test),', im_ft:',len(im_ft))
         return False
     
     for k in classes.keys():
-        # defining which classes to load and which part of data
+        # defining which classes to load and which part of data (not to load)
+        # bounds: [f, e] -> N*e//f-N//f : N*e//f
         if k[0]=='s':
             sig_n = k[2:]
-            s_hlf = halves[classes[k]]
+            if classes[k]=='full' or n_folds==1:
+                bound['s'] = [1, 0]
+            else:
+                bound['s'] = [n_folds, int(classes[k])]
         elif k[0]=='b':
             bckg_n = k[2:]
-            b_hlf = halves[classes[k]]
+            if classes[k]=='full' or n_folds==1:
+                bound['b'] = [1, 0]
+            else:
+                bound['b'] = [n_folds, int(classes[k])]
             
     with h5py.File(path_h5,'r') as datafile:
         for l in im_ft[0]*['/images/']+im_ft[1]*['/features/']:
@@ -170,19 +179,27 @@ def load_data_v2(classes={'s_C30keV':'full','b_gamma':'full'}, tr_val_test=[True
                 sig_t = sig_l+t
                 bckg_t = bckg_l+t
                 N_s, N_b = datafile[sig_t].shape[0], datafile[bckg_t].shape[0]
-                X[l+t] = np.vstack( (datafile[sig_t][N_s//s_hlf[0]-N_s//s_hlf[1]:N_s//s_hlf[0]],
-                                     datafile[bckg_t][N_b//b_hlf[0]-N_b//b_hlf[1]:N_b//b_hlf[0]]) )
-                y[l+t] = np.append(np.ones(N_s//s_hlf[1]),np.zeros(N_b//b_hlf[1]))
+                load_s, load_b = np.zeros(N_s, dtype=bool), np.zeros(N_b, dtype=bool)
+                if stratify: N_str = min(N_s, N_b); N_s, N_b = N_str, N_str
+                load_s[:N_s] = True; load_b[:N_b] = True
+                if t=='train':
+                    end["s"], end['b'] = N_s*bound['s'][1]//bound['s'][0], N_b*bound['b'][1]//bound['b'][0]
+                    start['s'], start['b'] = end['s']-N_s//bound['s'][0], end['b']-N_b//bound['b'][0]
+                    load_s[start['s']:end['s']] = False
+                    load_b[start['b']:end['b']] = False
+                X_s, X_b = datafile[sig_t][...], datafile[bckg_t][...]
+                X[l+t] = np.vstack( (X_s[load_s], X_b[load_b]) )
+                y[l+t] = np.append(np.ones(load_s.sum()),np.zeros(load_b.sum()))
                 gc.collect()
-                if l=='/images/': X[l+t].resize((*X[l+t].shape,1))
+                if l=='/images/' and ddd: X[l+t].resize((*X[l+t].shape,1))
                 if not t in shuf_ind.keys():
                     shuf_ind[t] = list(np.arange(X[l+t].shape[0]))
                     np.random.shuffle(shuf_ind[t])
                 X[l+t] = X[l+t][shuf_ind[t]]
                 y[l+t] = y[l+t][shuf_ind[t]]
                 if verbose==1:
-                    print('X'+'_'.join((l+t).split('/'))+' shape:  \t',X[l+t].shape)
-                    print('y'+'_'.join((l+t).split('/'))+' shape:  \t',y[l+t].shape)
+                    print('Number of '+t+' '+sig_n+' samples: \t',X_s[load_s].shape[0])
+                    print('Number of '+bckg_n+' samples: \t',X_b[load_b].shape[0])
                 if verbose==2:
                     print('Number of'+' '.join((l+t).split('/'))+' samples: ',X[l+t].shape[0])
                 gc.collect()
