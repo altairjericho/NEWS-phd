@@ -17,7 +17,7 @@ def precise(a_true, a_pred, thresh = 0.5):
             tpfp += 1
             if a_t:
                 tp += 1
-    if tpfp<1: print('tpfp<1, thresh:',thresh)
+    #if tpfp<1: print('nothing positive, thresh:',thresh)
     return tp/tpfp
 
 def accurate(a_true, a_pred, thresh = 0.5):
@@ -145,11 +145,13 @@ def clean_quantile_feat(params, quant_up, quant_down, clean_key):
 
 
 
-def load_data_v2(classes={'s_C30keV':'full','b_gamma':'full'}, n_folds=1, tr_val_test=[True,True,False], im_ft=[True,False], path_h5="/home/scanner-ml/Artem/Python/NEWS/data/dataset_clean.h5", shuf_ind={}, verbose=1, ddd=True, stratify=False):
+def load_data_v2(classes=None, n_folds=1, tr_val_test=[True,True,False], im_ft=[True,False], path_h5="/home/scanner-ml/Artem/Python/NEWS/data/dataset_clean.h5", shuf_ind=None, verbose=1, ddd=True, stratify=False):
     '''
     Documentation-shmocumentation
     Pseudo-cross-validation
     '''
+    if classes is None: classes = {'s_C30keV':'full','b_gamma':'full'}
+    if shuf_ind is None: shuf_ind = {}
     X,y,bound,start,end = {},{},{},{},{}
     if len(tr_val_test)<3 or len(im_ft)<2:
         print('len tr_val_test:',len(tr_val_test),', im_ft:',len(im_ft))
