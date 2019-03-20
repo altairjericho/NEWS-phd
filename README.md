@@ -1,13 +1,11 @@
 # NEWS-phd
 Notebooks and related info on the ML study of NEWSdm during PhD
 
-The data is represented by 8 grey-scale images for each sample
-* CNN - using 3D CNNs (8 images per sample stacked in a 3D image)
-  * Conv4_3D_residual_v2.ipynb - CNN training with 6-folds validation
-  * performance.ipynb - visualizing traning and test performance of the network on different signal classes.
-  * performance.ipynb - visualizing validation performance for 6 networks
-  * explore_features.ipynb - exploring the data where network is certain in it's decision
-  * old_vs_new.ipynb - comparing the performance of the CNN built and trained on the old dataset with the new residual CNN.
-* RNN - using 8 images as a sequence for RNN (further plans).
-* dataset.ipynb - loading images and features from csv's and ROOT, cleaning and saving to hdf5.
+The data is represented by 9 grey-scale images for each sample (periodic boundary conditions)
+* CNN - using 3D CNNs (9 images per sample stacked in a 3D image)
+  * Conv4_3D_residual_v3.ipynb - CNN training with/without random rotations during training
+  * performance_v3.ipynb - visualizing validation performance for networks trained on different signal-background
+* RNN - using 9 images as a sequence for RNN (further plans).
+* dataset.ipynb - loading images and features from csv's and ROOT, adding 9th polarisation as a copy of 1st, cleaning and saving to hdf5.
 * get_ims.C - script for extracting BFCL (best focused cluster) images from the ROOT files.
+* carb_test - checking correlations between barycenter shift analysis and CNNs for test carbon samples

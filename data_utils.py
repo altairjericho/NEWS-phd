@@ -7,9 +7,9 @@ import matplotlib.pyplot as plt
 
 
 
-def load_pol_images(pol_frame, path, class_name='C30keV', n_pols=8):
+def load_pol_images(pol_frame, path, class_name='C30keV', n_pol=8):
     """
-    Loads images into numpy array of shape (N,h,w,n_pols)
+    Loads images into numpy array of shape (N,h,w,n_pol)
     Empty pol images are filled with ZEROS
     
     Arguments:
@@ -31,6 +31,7 @@ def load_pol_images(pol_frame, path, class_name='C30keV', n_pols=8):
                 tmp_im.append(pd.read_csv(path+class_name+'/csvs/'+img_n, header=None).drop(32, axis=1).values)
             else:
                 tmp_im.append(np.zeros((32,32),dtype=np.uint8))
+        if n_pol==9: tmp_im.append(tmp_im[0])
         im_array.append(np.array(tmp_im, dtype=np.uint8).T)
         gc.collect()
         
@@ -76,6 +77,9 @@ def get_pol_feat(id_frame, n_pol, path_dir, class_name, feat_names):
                 pol_feat.append(0)
             else:
                 pol_feat.append( (t.GetLeaf('cl.lx').GetValue(int(cl_id))+eps)/(t.GetLeaf('cl.ly').GetValue(int(cl_id))+eps) )
+        if n_pol==9:
+            for i,name in enumerate(feat_names):
+                pol_feat.append(pol_feat[i])        
         pol_feat.append( tr_fl )
         pol_feat.append( n_pols )
         all_feat = np.vstack((all_feat, pol_feat))
@@ -85,11 +89,11 @@ def get_pol_feat(id_frame, n_pol, path_dir, class_name, feat_names):
 
 
 
-def bad_inds(pol_frame, imgs=None, features=None, f_name=None, isolated=True, quant=0.999, n_pols=8):
+def bad_inds(pol_frame, imgs=None, features=None, f_name=None, isolated=True, quant=0.999, n_pols=8, bad_i=[]):
     inds = set(pol_frame.index)
-    bad_i = set()
+    bad_i = set(bad_i)
     
-    if isolated: bad_i |= (inds-set( pol_frame[pol_frame['tr_flag']==-1].index ))
+    if isolated: bad_i |= (inds-set( pol_frame[pol_frame['tr_flag']<0].index ))
     if features is not None:
         bad_i |= (inds-set(features.dropna().index))
         tmp_feat = features.copy()
@@ -100,6 +104,7 @@ def bad_inds(pol_frame, imgs=None, features=None, f_name=None, isolated=True, qu
     if imgs is not None:
         for i, im_pols in enumerate(imgs):
             for j, im in enumerate(im_pols.T):
+                if 'pol'+str(j) not in pol_frame.keys(): continue
                 if  pol_frame['pol'+str(j)][i]!=-1 and not im.all(): bad_i |= {i}
     if f_name:
         print(len(bad_i),'\tBad ',f_name)
